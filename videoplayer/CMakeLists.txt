@@ -32,6 +32,7 @@ add_library( # Sets the name of the library.
              src/main/cpp/soundtouch/SoundTouch/TDStretch.cpp
              src/main/cpp/RayPcmBean.cpp
              src/main/cpp/RayBufferQueue.cpp
+             src/main/cpp/RayVideo.cpp
              )
 
 add_library( avcodec-57 SHARED IMPORTED)

@@ -9,6 +9,8 @@
 #include "pthread.h"
 #include "RayAudio.h"
 #include "RayPlayStatus.h"
+#include "RayVideo.h"
+
 extern "C"
 {
 #include <libavutil/time.h>
@@ -23,6 +25,7 @@ public:
     pthread_t decodeThread;
     AVFormatContext *avFormatContext;
     RayAudio *rayAudio = NULL;
+    RayVideo *rayVideo = NULL;
     RayPlayStatus* playStatus;
     pthread_mutex_t init_mutex;
     bool exit;
@@ -64,6 +67,8 @@ public:
     void startStopRecord(bool start);
 
     bool cutAudioPlay(int start_time, int end_time, bool showPcm);
+
+    int getAvCodecContext(AVCodecParameters *codecPar, AVCodecContext **avCodecContext);
 
 };
 

@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">RayVideoPlayer</string>
+    <string name="play_time">%s/%s</string>
 </resources>

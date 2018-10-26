@@ -11,7 +11,7 @@
 #define LOG_DEBUG true
 
 
-#define LOGI(FORMAT,...) __android_log_print(ANDROID_LOG_INFO,"RayMusic_native",FORMAT,##__VA_ARGS__);
-#define LOGW(FORMAT,...) __android_log_print(ANDROID_LOG_WARN,"RayMusic_native",FORMAT,##__VA_ARGS__);
-#define LOGD(FORMAT,...) __android_log_print(ANDROID_LOG_DEBUG,"RayMusic_native",FORMAT,##__VA_ARGS__);
-#define LOGE(FORMAT,...) __android_log_print(ANDROID_LOG_ERROR,"RayMusic_native",FORMAT,##__VA_ARGS__);
+#define LOGI(FORMAT,...) __android_log_print(ANDROID_LOG_INFO,"RayVideo_native",FORMAT,##__VA_ARGS__);
+#define LOGW(FORMAT,...) __android_log_print(ANDROID_LOG_WARN,"RayVideo_native",FORMAT,##__VA_ARGS__);
+#define LOGD(FORMAT,...) __android_log_print(ANDROID_LOG_DEBUG,"RayVideo_native",FORMAT,##__VA_ARGS__);
+#define LOGE(FORMAT,...) __android_log_print(ANDROID_LOG_ERROR,"RayVideo_native",FORMAT,##__VA_ARGS__);

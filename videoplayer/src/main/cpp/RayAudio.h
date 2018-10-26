@@ -26,7 +26,7 @@ class RayAudio {
 public:
     RayCallJava *callJava;
     int streamIndex = -1;
-    AVCodecParameters *codecpar = NULL;
+    AVCodecParameters *codecPar = NULL;
     AVCodecContext *avCodecContext = NULL;
     RayQueue *packetQueue = NULL;
     pthread_t play_thread;

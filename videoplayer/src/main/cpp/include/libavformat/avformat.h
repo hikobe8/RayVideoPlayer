@@ -205,7 +205,7 @@
  *   avio_open2() or a custom one.
  * - Unless the format is of the AVFMT_NOSTREAMS type, at least one stream must
  *   be created with the avformat_new_stream() function. The caller should fill
- *   the @ref AVStream.codecpar "stream codec parameters" information, such as the
+ *   the @ref AVStream.codecPar "stream codec parameters" information, such as the
  *   codec @ref AVCodecParameters.codec_type "type", @ref AVCodecParameters.codec_id
  *   "id" and other parameters (e.g. width / height, the pixel or sample format,
  *   etc.) as known. The @ref AVStream.time_base "stream timebase" should
@@ -887,7 +887,7 @@ typedef struct AVStream {
     int id;
 #if FF_API_LAVF_AVCTX
     /**
-     * @deprecated use the codecpar struct instead
+     * @deprecated use the codecPar struct instead
      */
     attribute_deprecated
     AVCodecContext *codec;

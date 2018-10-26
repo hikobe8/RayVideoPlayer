@@ -4,7 +4,7 @@
 
 #include "RayFFmpeg.h"
 
-RayFFmpeg::RayFFmpeg(RayPlayStatus* playStatus, RayCallJava *rayCallJava, const char *url) {
+RayFFmpeg::RayFFmpeg(RayPlayStatus *playStatus, RayCallJava *rayCallJava, const char *url) {
     this->playStatus = playStatus;
     this->callJava = rayCallJava;
     this->url = url;
@@ -18,8 +18,8 @@ RayFFmpeg::~RayFFmpeg() {
     pthread_mutex_destroy(&seek_mutex);
 }
 
-void * decodeRunnable(void *data){
-    RayFFmpeg* rayFFmpeg = (RayFFmpeg *)(data);
+void *decodeRunnable(void *data) {
+    RayFFmpeg *rayFFmpeg = (RayFFmpeg *) (data);
     rayFFmpeg->decodeByFFmepg();
     pthread_exit(&rayFFmpeg->decodeThread);
 }
@@ -28,8 +28,8 @@ void RayFFmpeg::prepare() {
     pthread_create(&decodeThread, NULL, decodeRunnable, this);
 }
 
-int interrupt_callback(void* ctx) {
-    RayFFmpeg *fFmpeg = (RayFFmpeg *)(ctx);
+int interrupt_callback(void *ctx) {
+    RayFFmpeg *fFmpeg = (RayFFmpeg *) (ctx);
     if (fFmpeg->playStatus->exit) {
         return AVERROR_EOF;
     }
@@ -63,17 +63,27 @@ void RayFFmpeg::decodeByFFmepg() {
         return;
     }
     for (int i = 0; i < avFormatContext->nb_streams; i++) {
-        if (avFormatContext->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+        if (avFormatContext->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) { //得到音频流
             if (rayAudio == NULL) {
-                rayAudio = new RayAudio(callJava, playStatus, avFormatContext->streams[i]->codecpar->sample_rate);
+                rayAudio = new RayAudio(callJava, playStatus,
+                                        avFormatContext->streams[i]->codecpar->sample_rate);
                 rayAudio->streamIndex = i;
-                rayAudio->codecpar = avFormatContext->streams[i]->codecpar;
-                rayAudio->duration = avFormatContext->duration / AV_TIME_BASE ;
+                rayAudio->codecPar = avFormatContext->streams[i]->codecpar;
+                rayAudio->duration = avFormatContext->duration / AV_TIME_BASE;
                 rayAudio->time_base = avFormatContext->streams[i]->time_base;
                 this->duration = rayAudio->duration;
                 if (callJava != NULL) {
-                    callJava->onGetPcmCutInfoSampleRate(avFormatContext->streams[i]->codecpar->sample_rate);
+                    callJava->onGetPcmCutInfoSampleRate(
+                            avFormatContext->streams[i]->codecpar->sample_rate);
                 }
+            }
+        } else if (avFormatContext->streams[i]->codecpar->codec_type ==
+                   AVMEDIA_TYPE_VIDEO) { //得到视频流
+            if (rayVideo == NULL) {
+                rayVideo = new RayVideo(playStatus, callJava);
+                rayVideo->streamIndex = i;
+                rayVideo->codecPar = avFormatContext->streams[i]->codecpar;
+                rayVideo->time_base = avFormatContext->streams[i]->time_base;
             }
         }
     }
@@ -86,48 +96,21 @@ void RayFFmpeg::decodeByFFmepg() {
         pthread_mutex_unlock(&init_mutex);
         return;
     }
-    AVCodec * avCodec = avcodec_find_decoder(rayAudio->codecpar->codec_id);
-    if (!avCodec) {
+    getAvCodecContext(rayAudio->codecPar, &rayAudio->avCodecContext);
+    if (rayVideo == NULL) {
         if (LOG_DEBUG) {
-            LOGE("can't find audio decoder!");
+            LOGW("no video stream founded : %s!", url);
         }
-        callJava->onCallError(CHILD_THREAD, 1004, "can't find audio decoder");
+        callJava->onCallError(CHILD_THREAD, 1003, "no video stream founded");
         exit = true;
         pthread_mutex_unlock(&init_mutex);
         return;
     }
-    rayAudio->avCodecContext = avcodec_alloc_context3(avCodec);
-    if (rayAudio->avCodecContext == NULL) {
-        if (LOG_DEBUG) {
-            LOGE("can't alloc new decoderContext!");
-        }
-        callJava->onCallError(CHILD_THREAD, 1005, "can't alloc new decoderContext");
-        exit = true;
-        pthread_mutex_unlock(&init_mutex);
-        return;
-    }
-    if (avcodec_parameters_to_context(rayAudio->avCodecContext, rayAudio->codecpar) < 0) {
-        if (LOG_DEBUG) {
-            LOGE("can't fill decoderContext!");
-        }
-        callJava->onCallError(CHILD_THREAD, 1006, "can't fill decoderContext");
-        exit = true;
-        pthread_mutex_unlock(&init_mutex);
-        return;
-    }
-    if (avcodec_open2(rayAudio->avCodecContext, avCodec, 0) != 0) {
-        if (LOG_DEBUG) {
-            LOGE("can't open audio streams: %s!", url);
-        }
-        callJava->onCallError(CHILD_THREAD, 1007, "can't open audio streams");
-        exit = true;
-        pthread_mutex_unlock(&init_mutex);
-        return;
-    }
+    getAvCodecContext(rayVideo->codecPar, &rayVideo->avCodecContext);
     if (playStatus != NULL) {
-        if(callJava != NULL && !playStatus->exit) {
+        if (callJava != NULL && !playStatus->exit) {
             callJava->onCallPrepared(CHILD_THREAD);
-        } else{
+        } else {
             exit = true;
         }
     }
@@ -140,15 +123,16 @@ void RayFFmpeg::start() {
         return;
     }
     rayAudio->play();
+    rayVideo->play();
     while (playStatus != NULL && !playStatus->exit) {
 
         if (playStatus->doSeek) {
-            av_usleep(1000*100);
+            av_usleep(1000 * 100);
             continue;
         }
 
-        if (rayAudio->packetQueue->getQueueSize() > 40){
-            av_usleep(1000*100);
+        if (rayAudio->packetQueue->getQueueSize() > 40) {
+            av_usleep(1000 * 100);
             continue;
         }
 
@@ -159,7 +143,9 @@ void RayFFmpeg::start() {
         if (retCode == 0) {
             if (avPacket->stream_index == rayAudio->streamIndex) {
                 rayAudio->packetQueue->putPacket(avPacket);
-            } else{
+            } else if(avPacket->stream_index == rayVideo->streamIndex) {
+                rayVideo->queue->putPacket(avPacket);
+            } else {
                 av_packet_free(&avPacket);
                 av_free(avPacket);
                 avPacket = NULL;
@@ -170,9 +156,9 @@ void RayFFmpeg::start() {
             avPacket = NULL;
             while (playStatus != NULL && !playStatus->exit) {
                 if (rayAudio->packetQueue->getQueueSize() > 0) {
-                    av_usleep(1000*100);
+                    av_usleep(1000 * 100);
                     continue;
-                } else{
+                } else {
                     playStatus->exit = true;
                     break;
                 }
@@ -214,57 +200,46 @@ void RayFFmpeg::release() {
     playStatus->exit = true;
     pthread_mutex_lock(&init_mutex);
     int sleepCount = 0;
-    while (!exit)
-    {
-        if(sleepCount > 1000)
-        {
+    while (!exit) {
+        if (sleepCount > 1000) {
             exit = true;
         }
-        if(LOG_DEBUG)
-        {
+        if (LOG_DEBUG) {
             LOGE("wait ffmpeg  exit %d", sleepCount);
         }
         sleepCount++;
         av_usleep(1000 * 10);//暂停10毫秒
     }
 
-    if(LOG_DEBUG)
-    {
+    if (LOG_DEBUG) {
         LOGE("释放 Audio");
     }
 
-    if(rayAudio != NULL)
-    {
+    if (rayAudio != NULL) {
         rayAudio->release();
-        delete(rayAudio);
+        delete (rayAudio);
         rayAudio = NULL;
     }
 
-    if(LOG_DEBUG)
-    {
+    if (LOG_DEBUG) {
         LOGE("释放 封装格式上下文");
     }
 
-    if(avFormatContext != NULL)
-    {
+    if (avFormatContext != NULL) {
         avformat_close_input(&avFormatContext);
         avformat_free_context(avFormatContext);
         avFormatContext = NULL;
     }
-    if(LOG_DEBUG)
-    {
+    if (LOG_DEBUG) {
         LOGE("释放 callJava");
     }
-    if(callJava != NULL)
-    {
+    if (callJava != NULL) {
         callJava = NULL;
     }
-    if(LOG_DEBUG)
-    {
+    if (LOG_DEBUG) {
         LOGE("释放 playstatus");
     }
-    if(playStatus != NULL)
-    {
+    if (playStatus != NULL) {
         playStatus = NULL;
     }
     pthread_mutex_unlock(&init_mutex);
@@ -339,4 +314,46 @@ bool RayFFmpeg::cutAudioPlay(int start_time, int end_time, bool showPcm) {
         }
     }
     return false;
+}
+
+int RayFFmpeg::getAvCodecContext(AVCodecParameters *codecPar, AVCodecContext **avCodecContext) {
+    AVCodec *avCodec = avcodec_find_decoder(codecPar->codec_id);
+    if (!avCodec) {
+        if (LOG_DEBUG) {
+            LOGE("can't find audio decoder!");
+        }
+        callJava->onCallError(CHILD_THREAD, 1004, "can't find audio decoder");
+        exit = true;
+        pthread_mutex_unlock(&init_mutex);
+        return -1;
+    }
+    *avCodecContext = avcodec_alloc_context3(avCodec);
+    if (*avCodecContext == NULL) {
+        if (LOG_DEBUG) {
+            LOGE("can't alloc new decoderContext!");
+        }
+        callJava->onCallError(CHILD_THREAD, 1005, "can't alloc new decoderContext");
+        exit = true;
+        pthread_mutex_unlock(&init_mutex);
+        return -1;
+    }
+    if (avcodec_parameters_to_context(*avCodecContext, codecPar) < 0) {
+        if (LOG_DEBUG) {
+            LOGE("can't fill decoderContext!");
+        }
+        callJava->onCallError(CHILD_THREAD, 1006, "can't fill decoderContext");
+        exit = true;
+        pthread_mutex_unlock(&init_mutex);
+        return -1;
+    }
+    if (avcodec_open2(*avCodecContext, avCodec, 0) != 0) {
+        if (LOG_DEBUG) {
+            LOGE("can't open audio streams: %s!", url);
+        }
+        callJava->onCallError(CHILD_THREAD, 1007, "can't open audio streams");
+        exit = true;
+        pthread_mutex_unlock(&init_mutex);
+        return -1;
+    }
+    return 0;
 }
