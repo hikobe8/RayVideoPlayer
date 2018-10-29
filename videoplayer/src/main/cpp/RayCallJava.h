@@ -27,6 +27,7 @@ public:
     jmethodID jMIDEncodePcm2Aac;
     jmethodID jMIDGetPcmCutInfo;
     jmethodID jMIDGetPcmCutInfoSampleRate;
+    jmethodID jMIDCallYUVData;
 
 public:
     RayCallJava(JavaVM *javaVM, JNIEnv *env, jobject obj);
@@ -50,6 +51,8 @@ public:
     void onGetPcmCutInfo(void* buffer, int size);
 
     void onGetPcmCutInfoSampleRate(int sampleRate);
+
+    void onCallRenderYUV(int width, int height, uint8_t *fy, uint8_t *fu, uint8_t *fv);
 };
 
 #endif //RAYMUSIC_RAYCALLJAVA_H

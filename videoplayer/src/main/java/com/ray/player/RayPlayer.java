@@ -310,6 +310,10 @@ public class RayPlayer {
         }
     }
 
+    public void onRenderYUVData(int width, int height, byte[] fy, byte[] fu, byte[] fv){
+
+    }
+
     private native void native_prepare(String source);
 
     private native void native_start();
