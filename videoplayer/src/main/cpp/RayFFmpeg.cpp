@@ -211,14 +211,23 @@ void RayFFmpeg::release() {
         av_usleep(1000 * 10);//暂停10毫秒
     }
 
-    if (LOG_DEBUG) {
-        LOGE("释放 Audio");
-    }
 
     if (rayAudio != NULL) {
+        if (LOG_DEBUG) {
+            LOGE("释放 Audio");
+        }
         rayAudio->release();
         delete (rayAudio);
         rayAudio = NULL;
+    }
+
+    if (rayVideo != NULL) {
+        if (LOG_DEBUG) {
+            LOGE("释放 video");
+        }
+        rayVideo->release();
+        delete (rayVideo);
+        rayVideo = NULL;
     }
 
     if (LOG_DEBUG) {

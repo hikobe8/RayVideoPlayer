@@ -10,7 +10,8 @@
 
 extern "C"
 {
-    #include "libavcodec/avcodec.h"
+#include "libavcodec/avcodec.h"
+#include <libavutil/time.h>
 };
 
 class RayVideo {
@@ -27,8 +28,11 @@ public:
 
 public:
     RayVideo(RayPlayStatus *status, RayCallJava *callJava);
+
     ~RayVideo();
+
     void play();
+    void release();
 };
 
 
