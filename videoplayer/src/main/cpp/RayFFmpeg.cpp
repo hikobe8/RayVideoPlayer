@@ -122,6 +122,10 @@ void RayFFmpeg::start() {
         callJava->onCallError(CHILD_THREAD, 1003, "no audio stream founded");
         return;
     }
+    if (rayVideo == NULL) {
+        callJava->onCallError(CHILD_THREAD, 1003, "no video stream founded");
+        return;
+    }
     rayAudio->play();
     rayVideo->play();
     while (playStatus != NULL && !playStatus->exit) {
