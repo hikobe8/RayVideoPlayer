@@ -6,6 +6,11 @@
     android:orientation="vertical"
     tools:context=".MainActivity">
 
+    <com.ray.opengl.RayGLSurfaceView
+        android:id="@+id/gl_surface"
+        android:layout_width="match_parent"
+        android:layout_height="250dp"/>
+
     <LinearLayout
         android:orientation="horizontal"
         android:layout_width="match_parent"

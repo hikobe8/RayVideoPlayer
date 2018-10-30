@@ -24,7 +24,9 @@ import com.ray.listener.OnPauseResumeListener;
 import com.ray.listener.OnRecordTimeChangeListener;
 import com.ray.listener.PlayTimeListener;
 import com.ray.listener.PlayerPrepareListener;
+import com.ray.listener.YUVDataListener;
 import com.ray.log.MyLog;
+import com.ray.opengl.RayGLSurfaceView;
 import com.ray.player.RayPlayer;
 import com.ray.type.ChannelType;
 
@@ -46,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
     private MHandler mMHandler;
     private int mPlayPosition;
     private boolean doSeek;
+    private RayGLSurfaceView mRayGLSurfaceView;
 
     static class MHandler extends Handler {
         WeakReference<MainActivity> mContextWeakReference;
@@ -74,6 +77,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        mRayGLSurfaceView = findViewById(R.id.gl_surface);
         mTvTime = findViewById(R.id.tv_time);
         mSeekBar = findViewById(R.id.seek_bar);
         mSeekBarVol = findViewById(R.id.seek_bar_volume);
@@ -201,7 +205,7 @@ public class MainActivity extends AppCompatActivity {
         });
         if (TEST_NET_SWITCH) {
 //            mPlayer.setSource("http://mpge.5nd.com/2015/2015-11-26/69708/1.mp3");
-            mPlayer.setSource("http://vfx.mtime.cn/Video/2017/03/31/mp4/170331093811717750.mp4");
+            mPlayer.setSource("http://vfx.mtime.cn/Video/2018/10/26/mp4/181026140242572417.mp4");
 //            mPlayer.setSource("http://live.hkstv.hk.lxdns.com/live/hks/playlist.m3u8");
         } else {
             mPlayer.setSource(Environment.getExternalStorageDirectory() + File.separator + TEST_FILE);
@@ -215,6 +219,12 @@ public class MainActivity extends AppCompatActivity {
                         mTvRecordTime.setText(TimeUtil.getMMssTime(seconds));
                     }
                 });
+            }
+        });
+        mPlayer.setYUVDataListener(new YUVDataListener() {
+            @Override
+            public void onGetYUVData(int width, int height, byte[] y, byte[] u, byte[] v) {
+                mRayGLSurfaceView.setYUVData(width, height, y, u, v);
             }
         });
         mPlayer.prepare();

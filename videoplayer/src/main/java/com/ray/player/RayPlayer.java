@@ -15,6 +15,7 @@ import com.ray.listener.OnPcmCutInfoListener;
 import com.ray.listener.OnRecordTimeChangeListener;
 import com.ray.listener.PlayTimeListener;
 import com.ray.listener.PlayerPrepareListener;
+import com.ray.listener.YUVDataListener;
 import com.ray.log.MyLog;
 import com.ray.type.ChannelType;
 
@@ -52,6 +53,7 @@ public class RayPlayer {
     private DbChangeListener mDbChangeListener;
     private OnRecordTimeChangeListener mOnRecordTimeChangeListener;
     private OnPcmCutInfoListener mOnPcmCutInfoListener;
+    private YUVDataListener mYUVDataListener;
 
     private static TimeInfo sTimeInfo;
     private static boolean sPlayNext;
@@ -97,6 +99,10 @@ public class RayPlayer {
 
     public void setOnPcmCutInfoListener(OnPcmCutInfoListener onPcmCutInfoListener) {
         mOnPcmCutInfoListener = onPcmCutInfoListener;
+    }
+
+    public void setYUVDataListener(YUVDataListener YUVDataListener) {
+        mYUVDataListener = YUVDataListener;
     }
 
     public void setSource(String source) {
@@ -227,7 +233,7 @@ public class RayPlayer {
             }
         } catch (IOException e) {
             e.printStackTrace();
-        }finally {
+        } finally {
             mAACOutputStream = null;
             mEncoder.stop();
             mEncoder.release();
@@ -304,14 +310,16 @@ public class RayPlayer {
         }
     }
 
-    public void onGetSampleRate(int sampleRate){
+    public void onGetSampleRate(int sampleRate) {
         if (mOnPcmCutInfoListener != null) {
             mOnPcmCutInfoListener.onGetSampleRate(sampleRate, 16, 2);
         }
     }
 
-    public void onRenderYUVData(int width, int height, byte[] fy, byte[] fu, byte[] fv){
-
+    public void onRenderYUVData(int width, int height, byte[] fy, byte[] fu, byte[] fv) {
+        if (mYUVDataListener != null) {
+            mYUVDataListener.onGetYUVData(width, height, fy, fu, fv);
+        }
     }
 
     private native void native_prepare(String source);
@@ -379,7 +387,7 @@ public class RayPlayer {
 
     private void encodePcm2Aac(int size, byte[] buffer) {
         if (buffer != null && mEncoder != null) {
-            mRecordTime += size * 1.0f / (mSampleRate * 2 *2);
+            mRecordTime += size * 1.0f / (mSampleRate * 2 * 2);
             if (mOnRecordTimeChangeListener != null) {
                 mOnRecordTimeChangeListener.onRecordTimeChanged((int) mRecordTime);
             }

@@ -135,7 +135,7 @@ void RayFFmpeg::start() {
             continue;
         }
 
-        if (rayAudio->packetQueue->getQueueSize() > 40) {
+        if (rayAudio->packetQueue->getQueueSize() > 20) {
             av_usleep(1000 * 100);
             continue;
         }

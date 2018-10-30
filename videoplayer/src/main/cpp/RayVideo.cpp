@@ -65,7 +65,8 @@ void *playVideo(void *data) {
             LOGI("当前视频格式为YUV420P格式")
             if (video->rayCallJava != NULL) {
                 video->rayCallJava->onCallRenderYUV(
-                        video->avCodecContext->width,
+//                        video->avCodecContext->width,
+                        avFrame->linesize[0],
                         video->avCodecContext->height,
                         avFrame->data[0],
                         avFrame->data[1],
