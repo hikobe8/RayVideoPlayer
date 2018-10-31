@@ -115,6 +115,11 @@ void *playVideo(void *data) {
                     pFrameYUV420P->linesize
             );
             //渲染
+
+            double diff = video->getFrameDiffTime(avFrame);
+
+            av_usleep(static_cast<unsigned int>(video->getDelayTime(diff) * 1000000));
+
             if (video->rayCallJava != NULL) {
                 video->rayCallJava->onCallRenderYUV(
                         video->avCodecContext->width,
