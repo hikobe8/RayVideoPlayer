@@ -7,6 +7,7 @@
 
 #include "RayQueue.h"
 #include "RayCallJava.h"
+#include "RayAudio.h"
 
 extern "C"
 {
@@ -27,6 +28,10 @@ public:
     RayPlayStatus *playStatus = NULL;
     pthread_t play_thread;
     RayCallJava *rayCallJava = NULL;
+    RayAudio *audio = NULL;
+    double clock = 0;
+    double delayTime = 0;
+    double defaultDelayTime = 0;
 
 public:
     RayVideo(RayPlayStatus *status, RayCallJava *callJava);
@@ -35,6 +40,8 @@ public:
 
     void play();
     void release();
+    double getFrameDiffTime(AVFrame *avFrame);
+    double getDelayTime(double diff);
 };
 
 

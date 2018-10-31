@@ -84,6 +84,13 @@ void RayFFmpeg::decodeByFFmepg() {
                 rayVideo->streamIndex = i;
                 rayVideo->codecPar = avFormatContext->streams[i]->codecpar;
                 rayVideo->time_base = avFormatContext->streams[i]->time_base;
+
+                int num = avFormatContext->streams[i]->avg_frame_rate.num;
+                int den = avFormatContext->streams[i]->avg_frame_rate.den;
+                if (num != 0 && den != 0) {
+                    int fps = num / den;
+                    rayVideo->defaultDelayTime = 1.0/fps;
+                }
             }
         }
     }
@@ -106,6 +113,7 @@ void RayFFmpeg::decodeByFFmepg() {
         pthread_mutex_unlock(&init_mutex);
         return;
     }
+    rayVideo->audio = rayAudio;
     getAvCodecContext(rayVideo->codecPar, &rayVideo->avCodecContext);
     if (playStatus != NULL) {
         if (callJava != NULL && !playStatus->exit) {
@@ -135,10 +143,10 @@ void RayFFmpeg::start() {
             continue;
         }
 
-        if (rayAudio->packetQueue->getQueueSize() > 20) {
-            av_usleep(1000 * 100);
-            continue;
-        }
+//        if (rayAudio->packetQueue->getQueueSize() > 20) {
+//            av_usleep(1000 * 100);
+//            continue;
+//        }
 
         AVPacket *avPacket = av_packet_alloc();
         pthread_mutex_lock(&seek_mutex);
@@ -147,7 +155,7 @@ void RayFFmpeg::start() {
         if (retCode == 0) {
             if (avPacket->stream_index == rayAudio->streamIndex) {
                 rayAudio->packetQueue->putPacket(avPacket);
-            } else if(avPacket->stream_index == rayVideo->streamIndex) {
+            } else if (avPacket->stream_index == rayVideo->streamIndex) {
                 rayVideo->queue->putPacket(avPacket);
             } else {
                 av_packet_free(&avPacket);

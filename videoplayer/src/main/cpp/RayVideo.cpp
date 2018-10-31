@@ -63,6 +63,11 @@ void *playVideo(void *data) {
         LOGI("子线程解码一个AVFrame成功")
         if (avFrame->format == AV_PIX_FMT_YUV420P) {
             LOGI("当前视频格式为YUV420P格式")
+
+            double diff = video->getFrameDiffTime(avFrame);
+
+            av_usleep(static_cast<unsigned int>(video->getDelayTime(diff) * 1000000));
+
             if (video->rayCallJava != NULL) {
                 video->rayCallJava->onCallRenderYUV(
 //                        video->avCodecContext->width,
@@ -154,4 +159,50 @@ void RayVideo::release() {
     if (rayCallJava != NULL) {
         rayCallJava = NULL;
     }
+}
+
+double RayVideo::getFrameDiffTime(AVFrame *avFrame) {
+    double  pts = av_frame_get_best_effort_timestamp(avFrame);
+    if (pts == AV_NOPTS_VALUE) {
+        pts = 0;
+    }
+    pts = pts * av_q2d(time_base);
+    if (pts > 0) {
+        clock = pts;
+    }
+    double diff = audio->clock - clock;
+    return diff;
+}
+
+double RayVideo::getDelayTime(double diff) {
+
+    if (diff > 0.003) {
+        delayTime = delayTime * 2.0 / 3;
+        if (delayTime < defaultDelayTime/2) {
+            delayTime = defaultDelayTime * 2.0 / 3;
+        } else if (delayTime > defaultDelayTime * 2) {
+            delayTime = defaultDelayTime * 2;
+        }
+    } else if (diff < -0.003) {
+        delayTime = delayTime * 3.0 / 2;
+        if (delayTime < defaultDelayTime/2) {
+            delayTime = defaultDelayTime * 2.0 / 3;
+        } else if (delayTime > defaultDelayTime * 2) {
+            delayTime = defaultDelayTime * 2;
+        }
+    } else if (diff == 0.003){
+
+    }
+
+    if (diff >= 0.5) {
+        delayTime = 0;
+    } else if (diff <= -0.5) {
+        delayTime = defaultDelayTime * 2;
+    }
+
+    if (fabs(diff) > 10) {
+        delayTime = defaultDelayTime;
+    }
+
+    return delayTime;
 }
