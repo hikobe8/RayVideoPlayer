@@ -21,10 +21,11 @@ RayAudio::RayAudio(RayCallJava *callJava, RayPlayStatus *playStatus, int sample_
     this->isCut = false;
     this->end_time = 0;
     this->showPcm = false;
+    pthread_mutex_init(&codecMutex, NULL);
 }
 
 RayAudio::~RayAudio() {
-
+    pthread_mutex_destroy(&codecMutex);
 }
 
 void *resampleRunnable(void *data) {
@@ -110,28 +111,27 @@ int RayAudio::resampleAudio(void **pcmBuff) {
                 callJava->onLoad(CHILD_THREAD, false);
             }
         }
-        if (readFrameFinished) {
-            avPacket = av_packet_alloc();
-            if (packetQueue->getPacket(avPacket) != 0) {
-                av_packet_free(&avPacket);
-                av_free(avPacket);
-                avPacket = NULL;
-                av_usleep(1000 * 100);
-                continue;
-            }
-            ret = avcodec_send_packet(avCodecContext, avPacket);
-            if (ret != 0) {
-                av_packet_free(&avPacket);
-                av_free(avPacket);
-                avPacket = NULL;
-                av_usleep(1000 * 100);
-                continue;
-            }
+        avPacket = av_packet_alloc();
+        if (packetQueue->getPacket(avPacket) != 0) {
+            av_packet_free(&avPacket);
+            av_free(avPacket);
+            avPacket = NULL;
+            av_usleep(1000 * 100);
+            continue;
+        }
+        pthread_mutex_lock(&codecMutex);
+        ret = avcodec_send_packet(avCodecContext, avPacket);
+        if (ret != 0) {
+            av_packet_free(&avPacket);
+            av_free(avPacket);
+            avPacket = NULL;
+            av_usleep(1000 * 100);
+            pthread_mutex_unlock(&codecMutex);
+            continue;
         }
         avFrame = av_frame_alloc();
         ret = avcodec_receive_frame(avCodecContext, avFrame);
         if (ret == 0) {
-            readFrameFinished = false;
             if (avFrame->channels > 0 && avFrame->channel_layout == 0) {
                 avFrame->channel_layout = av_get_default_channel_layout(avFrame->channels);
             } else if (avFrame->channels == 0 && avFrame->channel_layout > 0) {
@@ -156,7 +156,7 @@ int RayAudio::resampleAudio(void **pcmBuff) {
                 av_free(avFrame);
                 avFrame = NULL;
                 swr_free(&swr_ctx);
-                readFrameFinished = true;
+                pthread_mutex_unlock(&codecMutex);
                 continue;
             }
             nb = swr_convert(swr_ctx,
@@ -179,15 +179,16 @@ int RayAudio::resampleAudio(void **pcmBuff) {
             av_free(avFrame);
             avFrame = NULL;
             swr_free(&swr_ctx);
+            pthread_mutex_unlock(&codecMutex);
             break;
         } else {
-            readFrameFinished = true;
             av_packet_free(&avPacket);
             av_free(avPacket);
             avPacket = NULL;
             av_frame_free(&avFrame);
             av_free(avFrame);
             avFrame = NULL;
+            pthread_mutex_unlock(&codecMutex);
             continue;
         }
     }
@@ -212,12 +213,12 @@ void pcmBufferCallback(SLAndroidSimpleBufferQueueItf caller,
             }
             rayAudio->rayBufferQueue->putBuffer(rayAudio->sampleBuffer, dataSize*4);
             (*caller)->Enqueue(caller, (char *) rayAudio->sampleBuffer, dataSize * 2 * 2);
-            if (rayAudio->isCut) {
-                if (rayAudio->clock > rayAudio->end_time) {
-                    LOGI("裁剪结束");
-                    rayAudio->playStatus->exit = true;
-                }
-            }
+//            if (rayAudio->isCut) {
+//                if (rayAudio->clock > rayAudio->end_time) {
+//                    LOGI("裁剪结束");
+//                    rayAudio->playStatus->exit = true;
+//                }
+//            }
         }
     }
 }
@@ -400,9 +401,11 @@ void RayAudio::release() {
     }
 
     if (avCodecContext != NULL) {
+        pthread_mutex_lock(&codecMutex);
         avcodec_close(avCodecContext);
         avcodec_free_context(&avCodecContext);
         avCodecContext = NULL;
+        pthread_mutex_unlock(&codecMutex);
     }
 
     if (playStatus != NULL) {

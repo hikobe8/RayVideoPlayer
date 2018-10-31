@@ -65,13 +65,13 @@ public:
     int nb;
     int num;
     bool startRecord;
-    bool readFrameFinished = true;
     bool isCut;
     int end_time;
     bool showPcm;
     pthread_t pcmBufferThread;
     RayBufferQueue *rayBufferQueue;
     int default_buffer_size = 4096;
+    pthread_mutex_t codecMutex;
 
 public:
     RayAudio(RayCallJava *callJava, RayPlayStatus *playStatus, int sample_rate);

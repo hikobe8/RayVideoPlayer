@@ -143,11 +143,6 @@ void RayFFmpeg::start() {
             continue;
         }
 
-//        if (rayAudio->packetQueue->getQueueSize() > 20) {
-//            av_usleep(1000 * 100);
-//            continue;
-//        }
-
         AVPacket *avPacket = av_packet_alloc();
         pthread_mutex_lock(&seek_mutex);
         int retCode = av_read_frame(avFormatContext, avPacket);
@@ -171,7 +166,10 @@ void RayFFmpeg::start() {
                     av_usleep(1000 * 100);
                     continue;
                 } else {
-                    playStatus->exit = true;
+                    if (!playStatus->doSeek) {
+                        av_usleep(1000 * 500);
+                        playStatus->exit = true;
+                    }
                     break;
                 }
             }
@@ -188,12 +186,22 @@ void RayFFmpeg::start() {
 }
 
 void RayFFmpeg::pause() {
+
+    if (playStatus != NULL) {
+        playStatus->pause = true;
+    }
+
     if (rayAudio != NULL) {
         rayAudio->pause();
     }
 }
 
 void RayFFmpeg::resume() {
+
+    if (playStatus != NULL) {
+        playStatus->pause = false;
+    }
+
     if (rayAudio != NULL) {
         rayAudio->resume();
     }
@@ -272,18 +280,28 @@ void RayFFmpeg::seek(int64_t seconds) {
         return;
     }
     if (seconds >= 0 && seconds <= duration) {
+        playStatus->doSeek = true;
+        pthread_mutex_lock(&seek_mutex);
+        int64_t real = seconds * AV_TIME_BASE;
+        avformat_seek_file(avFormatContext, -1, INT64_MIN, real, INT64_MAX, 0);
         if (rayAudio != NULL) {
-            playStatus->doSeek = true;
             rayAudio->packetQueue->clearAVPacket();
             rayAudio->clock = 0;
             rayAudio->lastTime = 0;
-            pthread_mutex_lock(&seek_mutex);
-            int64_t real = seconds * AV_TIME_BASE;
+            pthread_mutex_lock(&rayAudio->codecMutex);
             avcodec_flush_buffers(rayAudio->avCodecContext);
-            avformat_seek_file(avFormatContext, -1, INT64_MIN, real, INT64_MAX, 0);
-            pthread_mutex_unlock(&seek_mutex);
-            playStatus->doSeek = false;
+            pthread_mutex_unlock(&rayAudio->codecMutex);
         }
+
+        if (rayVideo != NULL) {
+            rayVideo->queue->clearAVPacket();
+            rayVideo->clock = 0;
+            pthread_mutex_lock(&rayVideo->codecMutex);
+            avcodec_flush_buffers(rayVideo->avCodecContext);
+            pthread_mutex_unlock(&rayVideo->codecMutex);
+        }
+        pthread_mutex_unlock(&seek_mutex);
+        playStatus->doSeek = false;
     }
 }
 

@@ -32,6 +32,7 @@ public:
     double clock = 0;
     double delayTime = 0;
     double defaultDelayTime = 0;
+    pthread_mutex_t codecMutex;
 
 public:
     RayVideo(RayPlayStatus *status, RayCallJava *callJava);

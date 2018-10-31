@@ -11,6 +11,7 @@ public:
     bool exit;
     bool isLoading;
     bool doSeek = false;
+    bool pause = false;
 public:
     RayPlayStatus();
 };

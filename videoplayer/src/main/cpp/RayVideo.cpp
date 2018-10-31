@@ -9,11 +9,11 @@ RayVideo::RayVideo(RayPlayStatus *status, RayCallJava *callJava) {
     this->playStatus = status;
     this->rayCallJava = callJava;
     queue = new RayQueue(playStatus);
-
+    pthread_mutex_init(&codecMutex, NULL);
 }
 
 RayVideo::~RayVideo() {
-
+    pthread_mutex_destroy(&codecMutex);
 }
 
 void *playVideo(void *data) {
@@ -24,6 +24,12 @@ void *playVideo(void *data) {
             av_usleep(1000 * 100);
             continue;
         }
+
+        if (video->playStatus->pause) {
+            av_usleep(1000 * 100);
+            continue;
+        }
+
         if (video->queue->getQueueSize() == 0) {
             if (!video->playStatus->isLoading) {
                 video->playStatus->isLoading = true;
@@ -44,10 +50,12 @@ void *playVideo(void *data) {
             avPacket = NULL;
             continue;
         }
+        pthread_mutex_lock(&video->codecMutex);
         if (avcodec_send_packet(video->avCodecContext, avPacket) != 0) {
             av_packet_free(&avPacket);
             av_free(avPacket);
             avPacket = NULL;
+            pthread_mutex_unlock(&video->codecMutex);
             continue;
         }
         AVFrame *avFrame = av_frame_alloc();
@@ -58,6 +66,7 @@ void *playVideo(void *data) {
             av_packet_free(&avPacket);
             av_free(avPacket);
             avPacket = NULL;
+            pthread_mutex_unlock(&video->codecMutex);
             continue;
         }
         LOGI("子线程解码一个AVFrame成功")
@@ -103,6 +112,7 @@ void *playVideo(void *data) {
                 av_frame_free(&pFrameYUV420P);
                 av_free(pFrameYUV420P);
                 av_free(buffer);
+                pthread_mutex_unlock(&video->codecMutex);
                 continue;
             }
             sws_scale(
@@ -139,6 +149,7 @@ void *playVideo(void *data) {
         av_packet_free(&avPacket);
         av_free(avPacket);
         avPacket = NULL;
+        pthread_mutex_unlock(&video->codecMutex);
     }
     pthread_exit(&video->play_thread);
 
@@ -154,9 +165,11 @@ void RayVideo::release() {
         queue = NULL;
     }
     if (avCodecContext != NULL) {
+        pthread_mutex_lock(&codecMutex);
         avcodec_close(avCodecContext);
         avcodec_free_context(&avCodecContext);
         avCodecContext = NULL;
+        pthread_mutex_unlock(&codecMutex);
     }
     if (playStatus != NULL) {
         playStatus = NULL;
