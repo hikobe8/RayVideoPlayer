@@ -27,6 +27,7 @@ RayCallJava::RayCallJava(JavaVM *javaVM, JNIEnv *env, jobject obj) {
     jMIDGetPcmCutInfo = jniEnv->GetMethodID(jclz, "getPcmCutInfo", "([BI)V");
     jMIDGetPcmCutInfoSampleRate = jniEnv->GetMethodID(jclz, "onGetSampleRate", "(I)V");
     jMIDCallYUVData = jniEnv->GetMethodID(jclz, "onRenderYUVData", "(II[B[B[B)V");
+    jMIDCAllSupportHardwareDecode = jniEnv->GetMethodID(jclz, "onCallSupportHardwareDecode", "(Ljava/lang/String;)Z");
 }
 
 RayCallJava::~RayCallJava() {
@@ -205,4 +206,20 @@ void RayCallJava::onCallRenderYUV(int width, int height, uint8_t *fy, uint8_t *f
     jniEnv->DeleteLocalRef(jv);
     javaVM->DetachCurrentThread();
 
+}
+
+bool RayCallJava::onCallSupportHardwareDecode(const char *ffCodecName) {
+    bool support = false;
+    JNIEnv *jniEnv;
+    if (javaVM->AttachCurrentThread(&jniEnv, 0) != JNI_OK) {
+        if (LOG_DEBUG) {
+            LOGE("get child thread jniEnv error!");
+        }
+        return support;
+    }
+    jstring codecName = jniEnv->NewStringUTF(ffCodecName);
+    support = jniEnv->CallBooleanMethod(jobj, jMIDCAllSupportHardwareDecode, codecName);
+    jniEnv->DeleteLocalRef(codecName);
+    javaVM->DetachCurrentThread();
+    return support;
 }

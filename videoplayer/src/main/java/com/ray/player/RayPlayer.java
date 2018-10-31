@@ -18,6 +18,7 @@ import com.ray.listener.PlayerPrepareListener;
 import com.ray.listener.YUVDataListener;
 import com.ray.log.MyLog;
 import com.ray.type.ChannelType;
+import com.ray.util.VideoSupportUtil;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -320,6 +321,10 @@ public class RayPlayer {
         if (mYUVDataListener != null) {
             mYUVDataListener.onGetYUVData(width, height, fy, fu, fv);
         }
+    }
+
+    public boolean onCallSupportHardwareDecode(String ffCodecName){
+        return VideoSupportUtil.isSupportHardwareDecode(ffCodecName);
     }
 
     private native void native_prepare(String source);

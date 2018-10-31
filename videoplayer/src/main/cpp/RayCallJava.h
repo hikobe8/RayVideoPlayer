@@ -28,6 +28,7 @@ public:
     jmethodID jMIDGetPcmCutInfo;
     jmethodID jMIDGetPcmCutInfoSampleRate;
     jmethodID jMIDCallYUVData;
+    jmethodID jMIDCAllSupportHardwareDecode;
 
 public:
     RayCallJava(JavaVM *javaVM, JNIEnv *env, jobject obj);
@@ -53,6 +54,8 @@ public:
     void onGetPcmCutInfoSampleRate(int sampleRate);
 
     void onCallRenderYUV(int width, int height, uint8_t *fy, uint8_t *fu, uint8_t *fv);
+
+    bool onCallSupportHardwareDecode(const char * ffCodecName);
 };
 
 #endif //RAYMUSIC_RAYCALLJAVA_H

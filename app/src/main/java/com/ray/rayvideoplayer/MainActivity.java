@@ -14,7 +14,7 @@ import android.view.View;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
-import com.ray.TimeUtil;
+import com.ray.util.TimeUtil;
 import com.ray.entity.TimeInfo;
 import com.ray.listener.DbChangeListener;
 import com.ray.listener.OnCompleteListener;

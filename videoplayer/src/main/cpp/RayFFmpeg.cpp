@@ -113,7 +113,6 @@ void RayFFmpeg::decodeByFFmepg() {
         pthread_mutex_unlock(&init_mutex);
         return;
     }
-    rayVideo->audio = rayAudio;
     getAvCodecContext(rayVideo->codecPar, &rayVideo->avCodecContext);
     if (playStatus != NULL) {
         if (callJava != NULL && !playStatus->exit) {
@@ -134,11 +133,23 @@ void RayFFmpeg::start() {
         callJava->onCallError(CHILD_THREAD, 1003, "no video stream founded");
         return;
     }
+    rayVideo->audio = rayAudio;
+
+    const char* codecName = ((const AVCodec *)rayVideo->avCodecContext->codec)->name;
+    if (callJava->onCallSupportHardwareDecode(codecName)) {
+        LOGI("当前设备支持硬解码该视频");
+    }
+
     rayAudio->play();
     rayVideo->play();
     while (playStatus != NULL && !playStatus->exit) {
 
         if (playStatus->doSeek) {
+            av_usleep(1000 * 100);
+            continue;
+        }
+
+        if (rayAudio->packetQueue->getQueueSize() > 40) {
             av_usleep(1000 * 100);
             continue;
         }
