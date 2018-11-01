@@ -5,6 +5,9 @@
 #ifndef RAYVIDEOPLAYER_RAYVIDEO_H
 #define RAYVIDEOPLAYER_RAYVIDEO_H
 
+#define CODEC_YUV 0
+#define CODEC_MEDIACODEC 1
+
 #include "RayQueue.h"
 #include "RayCallJava.h"
 #include "RayAudio.h"
@@ -33,6 +36,7 @@ public:
     double delayTime = 0;
     double defaultDelayTime = 0;
     pthread_mutex_t codecMutex;
+    int codecType = CODEC_YUV;
 
 public:
     RayVideo(RayPlayStatus *status, RayCallJava *callJava);

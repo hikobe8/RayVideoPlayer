@@ -138,6 +138,7 @@ void RayFFmpeg::start() {
     const char* codecName = ((const AVCodec *)rayVideo->avCodecContext->codec)->name;
     if (callJava->onCallSupportHardwareDecode(codecName)) {
         LOGI("当前设备支持硬解码该视频");
+        rayVideo->codecType = CODEC_MEDIACODEC;
     }
 
     rayAudio->play();
