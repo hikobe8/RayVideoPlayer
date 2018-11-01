@@ -66,6 +66,8 @@ public class RayPlayer {
     private double mRecordTime;
     private int mSampleRate;
 
+    private MediaCodec mCodec;
+
     public void setPlayerPrepareListener(PlayerPrepareListener playerPrepareListener) {
         mPlayerPrepareListener = playerPrepareListener;
     }
@@ -323,7 +325,7 @@ public class RayPlayer {
         }
     }
 
-    public boolean onCallSupportHardwareDecode(String ffCodecName){
+    public boolean onCallSupportHardwareDecode(String ffCodecName) {
         return VideoSupportUtil.isSupportHardwareDecode(ffCodecName);
     }
 
@@ -496,4 +498,20 @@ public class RayPlayer {
         }
         return rate;
     }
+
+    public void initMediaCodec(String codecName, int width, int height, byte[] csd_0, byte[] csd_1) {
+        try {
+            String mime = VideoSupportUtil.findVideoCodecName(codecName);
+            mMediaFormat = MediaFormat.createVideoFormat(VideoSupportUtil.findVideoCodecName(codecName), width, height);
+            mMediaFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, width * height);
+            mMediaFormat.setByteBuffer("csd-0", ByteBuffer.wrap(csd_0));
+            mMediaFormat.setByteBuffer("csd-1", ByteBuffer.wrap(csd_1));
+            MyLog.d(mMediaFormat.toString());
+            mCodec = MediaCodec.createDecoderByType(mime);
+            mCodec.configure(mMediaFormat, null, null, 0);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
 }
