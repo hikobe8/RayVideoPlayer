@@ -37,6 +37,7 @@ public:
     double defaultDelayTime = 0;
     pthread_mutex_t codecMutex;
     int codecType = CODEC_YUV;
+    AVBSFContext *abs_ctx;
 
 public:
     RayVideo(RayPlayStatus *status, RayCallJava *callJava);

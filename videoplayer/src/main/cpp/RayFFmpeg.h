@@ -33,6 +33,9 @@ public:
     pthread_mutex_t seek_mutex;
     bool startRecord;
 
+    bool supportHardwareDecoe = false;
+    const AVBitStreamFilter *bsFilter = NULL;
+
 public:
     RayFFmpeg(RayPlayStatus* playStatus, RayCallJava *rayCallJava, const char *url);
 

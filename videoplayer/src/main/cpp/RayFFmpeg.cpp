@@ -136,8 +136,45 @@ void RayFFmpeg::start() {
     rayVideo->audio = rayAudio;
 
     const char* codecName = ((const AVCodec *)rayVideo->avCodecContext->codec)->name;
-    if (callJava->onCallSupportHardwareDecode(codecName)) {
+    if ((supportHardwareDecoe = callJava->onCallSupportHardwareDecode(codecName))) {
         LOGI("当前设备支持硬解码该视频");
+        if (strcasecmp(codecName, "h264") == 0) {
+            bsFilter = av_bsf_get_by_name("h264_mp4toannexb");
+        } else if (strcasecmp(codecName, "h265") == 0) {
+            bsFilter = av_bsf_get_by_name("hevc_mp4toannexb");
+        }
+
+        if (bsFilter == NULL) {
+            supportHardwareDecoe = false;
+            goto end;
+        }
+
+        if (av_bsf_alloc(bsFilter, &rayVideo->abs_ctx) != 0) {
+            supportHardwareDecoe = false;
+            goto end;
+        }
+
+        if (avcodec_parameters_copy(rayVideo->abs_ctx->par_in, rayVideo->codecPar) < 0) {
+            supportHardwareDecoe = false;
+            av_bsf_free(&rayVideo->abs_ctx);
+            rayVideo->abs_ctx = NULL;
+            goto end;
+        }
+
+        if (av_bsf_init(rayVideo->abs_ctx) != 0) {
+            supportHardwareDecoe = false;
+            av_bsf_free(&rayVideo->abs_ctx);
+            rayVideo->abs_ctx = NULL;
+            goto end;
+        }
+
+        rayVideo->abs_ctx->time_base_in = rayVideo->time_base;
+
+    }
+
+    end:
+
+    if (supportHardwareDecoe) {
         rayVideo->codecType = CODEC_MEDIACODEC;
     }
 

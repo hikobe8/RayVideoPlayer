@@ -51,9 +51,19 @@ void *playVideo(void *data) {
             continue;
         }
         if (video->codecType == CODEC_MEDIACODEC) {
-            LOGI("硬解码视频");
-            av_packet_free(&avPacket);
-            av_free(avPacket);
+            if (av_bsf_send_packet(video->abs_ctx, avPacket) != 0) {
+                av_packet_free(&avPacket);
+                av_free(avPacket);
+                avPacket = NULL;
+                continue;
+            }
+
+            while (av_bsf_receive_packet(video->abs_ctx, avPacket) == 0) {
+                LOGI("开始解码");
+                av_packet_free(&avPacket);
+                av_free(avPacket);
+                continue;
+            }
             avPacket = NULL;
         } else if (video->codecType == CODEC_YUV) {
             pthread_mutex_lock(&video->codecMutex);
@@ -171,6 +181,12 @@ void RayVideo::release() {
         delete (queue);
         queue = NULL;
     }
+
+    if (abs_ctx != NULL) {
+        av_bsf_free(&abs_ctx);
+        abs_ctx = NULL;
+    }
+
     if (avCodecContext != NULL) {
         pthread_mutex_lock(&codecMutex);
         avcodec_close(avCodecContext);
