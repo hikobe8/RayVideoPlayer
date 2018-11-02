@@ -4,6 +4,7 @@ import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.text.TextUtils;
+import android.view.Surface;
 
 import com.ray.entity.TimeInfo;
 import com.ray.listener.DbChangeListener;
@@ -17,6 +18,8 @@ import com.ray.listener.PlayTimeListener;
 import com.ray.listener.PlayerPrepareListener;
 import com.ray.listener.YUVDataListener;
 import com.ray.log.MyLog;
+import com.ray.opengl.RayGLSurfaceView;
+import com.ray.opengl.VideoRenderer;
 import com.ray.type.ChannelType;
 import com.ray.util.VideoSupportUtil;
 
@@ -66,7 +69,23 @@ public class RayPlayer {
     private double mRecordTime;
     private int mSampleRate;
 
-    private MediaCodec mCodec;
+    private MediaCodec mMediaCodec;
+    private Surface mSurface;
+    private MediaCodec.BufferInfo mBufferInfo;
+    private RayGLSurfaceView mRayGLSurfaceView;
+
+    public void setRayGLSurfaceView(RayGLSurfaceView rayGLSurfaceView) {
+        mRayGLSurfaceView = rayGLSurfaceView;
+        mRayGLSurfaceView.getVideoRenderer().setOnSurfaceCreateListener(new VideoRenderer.OnSurfaceCreateListener() {
+            @Override
+            public void onSurfaceCreated(Surface surface) {
+                if (mSurface == null) {
+                    mSurface = surface;
+                    MyLog.d("onSurfaceCreated");
+                }
+            }
+        });
+    }
 
     public void setPlayerPrepareListener(PlayerPrepareListener playerPrepareListener) {
         mPlayerPrepareListener = playerPrepareListener;
@@ -321,6 +340,7 @@ public class RayPlayer {
 
     public void onRenderYUVData(int width, int height, byte[] fy, byte[] fu, byte[] fv) {
         if (mYUVDataListener != null) {
+            mRayGLSurfaceView.getVideoRenderer().setRenderType(VideoRenderer.RENDER_YUV);
             mYUVDataListener.onGetYUVData(width, height, fy, fu, fv);
         }
     }
@@ -368,7 +388,7 @@ public class RayPlayer {
 
     private void initMediaCodec(File outFile, int sampleRate) {
         try {
-            mAacSampleRate = getADTSsamplerate(sampleRate);
+            mAacSampleRate = getADTSSamplerate(sampleRate);
             mMediaFormat = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, sampleRate, 2);
             mMediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, 96000);
             mMediaFormat.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
@@ -453,7 +473,7 @@ public class RayPlayer {
         packet[6] = (byte) 0xFC;
     }
 
-    private int getADTSsamplerate(int samplerate) {
+    private int getADTSSamplerate(int samplerate) {
         int rate = 4;
         switch (samplerate) {
             case 96000:
@@ -500,18 +520,48 @@ public class RayPlayer {
     }
 
     public void initMediaCodec(String codecName, int width, int height, byte[] csd_0, byte[] csd_1) {
-        try {
-            String mime = VideoSupportUtil.findVideoCodecName(codecName);
-            mMediaFormat = MediaFormat.createVideoFormat(VideoSupportUtil.findVideoCodecName(codecName), width, height);
-            mMediaFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, width * height);
-            mMediaFormat.setByteBuffer("csd-0", ByteBuffer.wrap(csd_0));
-            mMediaFormat.setByteBuffer("csd-1", ByteBuffer.wrap(csd_1));
-            MyLog.d(mMediaFormat.toString());
-            mCodec = MediaCodec.createDecoderByType(mime);
-            mCodec.configure(mMediaFormat, null, null, 0);
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (mSurface != null) {
+            try {
+                mRayGLSurfaceView.getVideoRenderer().setRenderType(VideoRenderer.RENDER_MEDIACODEC);
+                String mime = VideoSupportUtil.findVideoCodecName(codecName);
+                mMediaFormat = MediaFormat.createVideoFormat(VideoSupportUtil.findVideoCodecName(codecName), width, height);
+                mMediaFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, width * height);
+                mMediaFormat.setByteBuffer("csd-0", ByteBuffer.wrap(csd_0));
+                mMediaFormat.setByteBuffer("csd-1", ByteBuffer.wrap(csd_1));
+                MyLog.d(mMediaFormat.toString());
+                mMediaCodec = MediaCodec.createDecoderByType(mime);
+                mBufferInfo = new MediaCodec.BufferInfo();
+                mMediaCodec.configure(mMediaFormat, mSurface, null, 0);
+                mMediaCodec.start();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else {
+            if (mOnErrorListener != null) {
+                mOnErrorListener.onError(2001, "surface is null");
+            }
         }
+
+    }
+
+    public void decodeAVPacket(int dataSize, byte[] data){
+
+        if (mSurface != null && dataSize > 0 && data != null && mMediaCodec != null) {
+            int inputBufferIndex = mMediaCodec.dequeueInputBuffer(10);
+            if (inputBufferIndex >= 0) {
+                ByteBuffer byteBuffer = mMediaCodec.getInputBuffers()[inputBufferIndex];
+                byteBuffer.clear();
+                byteBuffer.put(data);
+                mMediaCodec.queueInputBuffer(inputBufferIndex, 0, dataSize, 0, 0);
+            }
+
+            int outputBufferIndex = mMediaCodec.dequeueOutputBuffer(mBufferInfo, 10);
+            while (outputBufferIndex > 0) {
+                mMediaCodec.releaseOutputBuffer(outputBufferIndex, true);
+                outputBufferIndex = mMediaCodec.dequeueOutputBuffer(mBufferInfo, 10);
+            }
+        }
+
     }
 
 }

@@ -23,6 +23,12 @@ public class RayGLSurfaceView extends GLSurfaceView {
         mVideoRenderer = new VideoRenderer(context);
         setRenderer(mVideoRenderer);
         setRenderMode(RENDERMODE_WHEN_DIRTY);
+        mVideoRenderer.setOnRenderListener(new VideoRenderer.OnRenderListener() {
+            @Override
+            public void onRender() {
+                requestRender();
+            }
+        });
     }
 
     public void setYUVData(int width, int height, byte[] y, byte[] u, byte[] v) {
@@ -32,4 +38,7 @@ public class RayGLSurfaceView extends GLSurfaceView {
         }
     }
 
+    public VideoRenderer getVideoRenderer() {
+        return mVideoRenderer;
+    }
 }

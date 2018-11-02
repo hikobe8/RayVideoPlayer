@@ -28,6 +28,8 @@ RayCallJava::RayCallJava(JavaVM *javaVM, JNIEnv *env, jobject obj) {
     jMIDGetPcmCutInfoSampleRate = jniEnv->GetMethodID(jclz, "onGetSampleRate", "(I)V");
     jMIDCallYUVData = jniEnv->GetMethodID(jclz, "onRenderYUVData", "(II[B[B[B)V");
     jMIDCAllSupportHardwareDecode = jniEnv->GetMethodID(jclz, "onCallSupportHardwareDecode", "(Ljava/lang/String;)Z");
+    jMIDOnCallInitMediaCodec = jniEnv->GetMethodID(jclz, "initMediaCodec", "(Ljava/lang/String;II[B[B)V");
+    jMIDOnCallDecodeAVPacket = jniEnv->GetMethodID(jclz, "decodeAVPacket", "(I[B)V");
 }
 
 RayCallJava::~RayCallJava() {
@@ -222,4 +224,46 @@ bool RayCallJava::onCallSupportHardwareDecode(const char *ffCodecName) {
     jniEnv->DeleteLocalRef(codecName);
     javaVM->DetachCurrentThread();
     return support;
+}
+
+void RayCallJava::onCallInitMediaCodec(const char *codecName, int width, int height, int csd0Size,
+                                       uint8_t *csd0, int csd1Size, uint8_t *csd1) {
+
+    JNIEnv *jniEnv;
+    if (javaVM->AttachCurrentThread(&jniEnv, 0) != JNI_OK) {
+        if (LOG_DEBUG) {
+            LOGE("get child thread jniEnv error!");
+        }
+        return;
+    }
+    jstring jCodecName = jniEnv->NewStringUTF(codecName);
+
+    jbyteArray jCsd0ByteArr = jniEnv->NewByteArray(csd0Size);
+    jniEnv->SetByteArrayRegion(jCsd0ByteArr, 0, csd0Size, reinterpret_cast<const jbyte *>(csd0));
+
+    jbyteArray jCsd1ByteArr = jniEnv->NewByteArray(csd1Size);
+    jniEnv->SetByteArrayRegion(jCsd1ByteArr, 0, csd0Size, reinterpret_cast<const jbyte *>(csd1));
+
+    jniEnv->CallVoidMethod(jobj, jMIDOnCallInitMediaCodec, jCodecName, width, height, jCsd0ByteArr, jCsd1ByteArr);
+
+    jniEnv->DeleteLocalRef(jCodecName);
+    jniEnv->DeleteLocalRef(jCsd0ByteArr);
+    jniEnv->DeleteLocalRef(jCsd1ByteArr);
+    javaVM->DetachCurrentThread();
+}
+
+void RayCallJava::onCallDecodeAVPacket(int dataSize, uint8_t *packetData) {
+    JNIEnv *jniEnv;
+    if (javaVM->AttachCurrentThread(&jniEnv, 0) != JNI_OK) {
+        if (LOG_DEBUG) {
+            LOGE("get child thread jniEnv error!");
+        }
+        return;
+    }
+
+    jbyteArray data = jniEnv->NewByteArray(dataSize);
+    jniEnv->SetByteArrayRegion(data, 0, dataSize, reinterpret_cast<const jbyte *>(packetData));
+    jniEnv->CallVoidMethod(jobj, jMIDOnCallDecodeAVPacket, dataSize, data);
+    jniEnv->DeleteLocalRef(data);
+    javaVM->DetachCurrentThread();
 }

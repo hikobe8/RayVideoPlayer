@@ -1,7 +1,10 @@
 package com.ray.opengl;
 
 import android.content.Context;
+import android.graphics.SurfaceTexture;
+import android.opengl.GLES11Ext;
 import android.opengl.GLSurfaceView;
+import android.view.Surface;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -47,7 +50,10 @@ import static android.opengl.GLES20.glViewport;
  *  Create at 2018-10-30 14:59
  *  description : 视频渲染使用的renderer
  */
-public class VideoRenderer implements GLSurfaceView.Renderer {
+public class VideoRenderer implements GLSurfaceView.Renderer, SurfaceTexture.OnFrameAvailableListener {
+
+    public static final int RENDER_YUV = 1;
+    public static final int RENDER_MEDIACODEC = 2;
 
     private Context mContext;
 
@@ -67,6 +73,9 @@ public class VideoRenderer implements GLSurfaceView.Renderer {
 
     private FloatBuffer mVertexBuffer;
     private FloatBuffer mTextureBuffer;
+    private int mRenderType = RENDER_YUV;
+
+    //YUV
     private int mProgramYUV;
     private int mAvPositionYUV;
     private int mAfPositionYUV;
@@ -79,6 +88,15 @@ public class VideoRenderer implements GLSurfaceView.Renderer {
     private ByteBuffer mYBuffer;
     private ByteBuffer mUBuffer;
     private ByteBuffer mVBuffer;
+
+    //MediaCodec
+    private int mProgramMediaCodec;
+    private int mAvPositionMediaCodec;
+    private int mAfPositionMediaCodec;
+    private int mSamplerOESMediaCodec;
+    private int mTextureIdMediaCodec;
+    private SurfaceTexture mSurfaceTexture;
+    private Surface mSurface;
 
     public VideoRenderer(Context context) {
         mContext = context;
@@ -107,6 +125,7 @@ public class VideoRenderer implements GLSurfaceView.Renderer {
     @Override
     public void onSurfaceCreated(GL10 gl, EGLConfig config) {
         initRenderYUV();
+        initRenderMediaCodec();
     }
 
     private void initRenderYUV() {
@@ -129,6 +148,42 @@ public class VideoRenderer implements GLSurfaceView.Renderer {
         }
     }
 
+    private void initRenderMediaCodec(){
+        String vertexSource = ShaderUtils.readAssetsShader(mContext, "shader/vertex_shader.glsl");
+        String fragmentSource = ShaderUtils.readAssetsShader(mContext, "shader/fragment_mediacodec.glsl");
+        mProgramMediaCodec = ShaderUtils.createProgram(vertexSource, fragmentSource);
+        mAvPositionMediaCodec = glGetAttribLocation(mProgramMediaCodec, "av_Position");
+        mAfPositionMediaCodec = glGetAttribLocation(mProgramMediaCodec, "af_Position");
+        mSamplerOESMediaCodec = glGetUniformLocation(mProgramMediaCodec, "sTexture");
+
+        int[] textureIds = new int[1];
+        glGenTextures(1, textureIds, 0);
+        mTextureIdMediaCodec = textureIds[0];
+        glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        mSurfaceTexture = new SurfaceTexture(mTextureIdMediaCodec);
+        mSurface = new Surface(mSurfaceTexture);
+        mSurfaceTexture.setOnFrameAvailableListener(this);
+
+        if (mOnSurfaceCreateListener != null) {
+            mOnSurfaceCreateListener.onSurfaceCreated(mSurface);
+        }
+
+    }
+
+    public interface OnSurfaceCreateListener {
+        void onSurfaceCreated(Surface surface);
+    }
+
+    private OnSurfaceCreateListener mOnSurfaceCreateListener;
+
+    public void setOnSurfaceCreateListener(OnSurfaceCreateListener onSurfaceCreateListener) {
+        mOnSurfaceCreateListener = onSurfaceCreateListener;
+    }
+
     @Override
     public void onSurfaceChanged(GL10 gl, int width, int height) {
         glViewport(0, 0, width, height);
@@ -138,7 +193,11 @@ public class VideoRenderer implements GLSurfaceView.Renderer {
     public void onDrawFrame(GL10 gl) {
         glClear(GL_COLOR_BUFFER_BIT);
         glClearColor(0f, 0f, 0f, 1f);
-        renderYUV();
+        if (mRenderType == RENDER_YUV) {
+            renderYUV();
+        } else if (mRenderType == RENDER_MEDIACODEC) {
+            renderMediaCodec();
+        }
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         glDisableVertexAttribArray(mAvPositionYUV);
         glDisableVertexAttribArray(mAfPositionYUV);
@@ -180,4 +239,40 @@ public class VideoRenderer implements GLSurfaceView.Renderer {
         }
     }
 
+    private void renderMediaCodec() {
+        mSurfaceTexture.updateTexImage();
+        glUseProgram(mProgramMediaCodec);
+        glEnableVertexAttribArray(mAvPositionMediaCodec);
+        glVertexAttribPointer(mAvPositionMediaCodec, 2, GL_FLOAT, false, 8, mVertexBuffer);
+
+        glEnableVertexAttribArray(mAfPositionMediaCodec);
+        glVertexAttribPointer(mAfPositionMediaCodec, 2, GL_FLOAT, false, 8, mTextureBuffer);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, mTextureIdMediaCodec);
+        glUniform1i(mSamplerOESMediaCodec, 0);
+    }
+
+    public interface OnRenderListener{
+        void onRender();
+    }
+
+    public void setRenderType(int renderType) {
+        mRenderType = renderType;
+    }
+
+    private OnRenderListener mOnRenderListener;
+
+    public void setOnRenderListener(OnRenderListener onRenderListener) {
+        mOnRenderListener = onRenderListener;
+    }
+
+    @Override
+    public void onFrameAvailable(SurfaceTexture surfaceTexture) {
+
+        if (mOnRenderListener != null) {
+            mOnRenderListener.onRender();
+        }
+
+    }
 }

@@ -78,6 +78,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         mRayGLSurfaceView = findViewById(R.id.gl_surface);
+        mPlayer = new RayPlayer();
+        mPlayer.setRayGLSurfaceView(mRayGLSurfaceView);
         mTvTime = findViewById(R.id.tv_time);
         mSeekBar = findViewById(R.id.seek_bar);
         mSeekBarVol = findViewById(R.id.seek_bar_volume);
@@ -145,7 +147,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void prepare() {
-        mPlayer = new RayPlayer();
         mSeekBarVol.setProgress(mPlayer.getVolume());
         mPlayer.setPlayerPrepareListener(new PlayerPrepareListener() {
             @Override

@@ -176,6 +176,15 @@ void RayFFmpeg::start() {
 
     if (supportHardwareDecoe) {
         rayVideo->codecType = CODEC_MEDIACODEC;
+        rayVideo->rayCallJava->onCallInitMediaCodec(
+                codecName,
+                rayVideo->avCodecContext->width,
+                rayVideo->avCodecContext->height,
+                rayVideo->avCodecContext->extradata_size,
+                rayVideo->avCodecContext->extradata,
+                rayVideo->avCodecContext->extradata_size,
+                rayVideo->avCodecContext->extradata
+        );
     }
 
     rayAudio->play();
