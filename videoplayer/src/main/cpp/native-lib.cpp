@@ -28,7 +28,8 @@ extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reversed) {
 void* startCallback(void* ctx) {
     RayFFmpeg *fFmpeg = (RayFFmpeg *)(ctx);
     fFmpeg->start();
-    pthread_exit(&startThread);
+//    pthread_exit(&startThread);
+    return 0;
 }
 
 extern "C"
@@ -84,6 +85,9 @@ Java_com_ray_player_RayPlayer_native_1stop(JNIEnv *env, jobject instance) {
     nativeStopping = true;
     if (rayFFmpeg != NULL) {
         rayFFmpeg->release();
+
+        pthread_join(startThread, NULL);
+
         delete(rayFFmpeg);
         rayFFmpeg = NULL;
 

@@ -21,11 +21,13 @@ RayFFmpeg::~RayFFmpeg() {
 void *decodeRunnable(void *data) {
     RayFFmpeg *rayFFmpeg = (RayFFmpeg *) (data);
     rayFFmpeg->decodeByFFmepg();
-    pthread_exit(&rayFFmpeg->decodeThread);
+//    pthread_exit(&rayFFmpeg->decodeThread);
+    return 0;
 }
 
 void RayFFmpeg::prepare() {
-    pthread_create(&decodeThread, NULL, decodeRunnable, this);
+    if (playStatus != NULL && !playStatus->exit)
+        pthread_create(&decodeThread, NULL, decodeRunnable, this);
 }
 
 int interrupt_callback(void *ctx) {
@@ -276,6 +278,7 @@ void RayFFmpeg::release() {
         LOGD("开始释放ffmpeg");
     }
     playStatus->exit = true;
+    pthread_join(decodeThread, NULL);
     pthread_mutex_lock(&init_mutex);
     int sleepCount = 0;
     while (!exit) {

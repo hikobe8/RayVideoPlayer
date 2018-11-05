@@ -69,10 +69,17 @@ public class RayPlayer {
     private double mRecordTime;
     private int mSampleRate;
 
-    private MediaCodec mMediaCodec;
     private Surface mSurface;
-    private MediaCodec.BufferInfo mBufferInfo;
     private RayGLSurfaceView mRayGLSurfaceView;
+
+    //MediaCodec
+    private MediaFormat mMediaFormat;
+    private MediaCodec mMediaCodec;
+    private MediaCodec.BufferInfo mBufferInfo;
+    private FileOutputStream mAACOutputStream;
+    private int mPerPcmSize;
+    private byte[] mOutByteBuffer;
+    private int mAacSampleRate = 4;
 
     public void setRayGLSurfaceView(RayGLSurfaceView rayGLSurfaceView) {
         mRayGLSurfaceView = rayGLSurfaceView;
@@ -173,10 +180,12 @@ public class RayPlayer {
 
     public void stop() {
         sTimeInfo = null;
+        sDuration = 0;
         new Thread(new Runnable() {
             @Override
             public void run() {
                 native_stop();
+                releaseMediaCodecVideo();
             }
         }).start();
     }
@@ -247,7 +256,7 @@ public class RayPlayer {
     }
 
     private void releaseMediaCodec() {
-        if (mEncoder == null)
+        if (mMediaCodec == null)
             return;
         try {
             if (mAACOutputStream != null) {
@@ -257,11 +266,11 @@ public class RayPlayer {
             e.printStackTrace();
         } finally {
             mAACOutputStream = null;
-            mEncoder.stop();
-            mEncoder.release();
-            mEncoder = null;
+            mMediaCodec.stop();
+            mMediaCodec.release();
+            mMediaCodec = null;
             mMediaFormat = null;
-            mInfo = null;
+            mBufferInfo = null;
             mInitMediaCodec = false;
             MyLog.d("录制完成");
         }
@@ -377,15 +386,6 @@ public class RayPlayer {
 
     private native boolean native_cutAudioPlay(int startTime, int endTime, boolean showPcm);
 
-    //MediaCodec
-    private MediaFormat mMediaFormat;
-    private MediaCodec mEncoder;
-    private FileOutputStream mAACOutputStream;
-    private MediaCodec.BufferInfo mInfo;
-    private int mPerPcmSize;
-    private byte[] mOutByteBuffer;
-    private int mAacSampleRate = 4;
-
     private void initMediaCodec(File outFile, int sampleRate) {
         try {
             mAacSampleRate = getADTSSamplerate(sampleRate);
@@ -395,15 +395,15 @@ public class RayPlayer {
 // java.lang.IllegalStateException native_dequeueOutputBuffer
 // mMediaFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 4096);
             mMediaFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 12000);
-            mEncoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC);
-            if (mEncoder == null) {
+            mMediaCodec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC);
+            if (mMediaCodec == null) {
                 MyLog.d("create encoder wrong");
                 return;
             }
-            mInfo = new MediaCodec.BufferInfo();
-            mEncoder.configure(mMediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+            mBufferInfo = new MediaCodec.BufferInfo();
+            mMediaCodec.configure(mMediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
             mAACOutputStream = new FileOutputStream(outFile);
-            mEncoder.start();
+            mMediaCodec.start();
             native_startStopRecord(true);
             mInitMediaCodec = true;
         } catch (IOException e) {
@@ -413,43 +413,43 @@ public class RayPlayer {
     }
 
     private void encodePcm2Aac(int size, byte[] buffer) {
-        if (buffer != null && mEncoder != null) {
+        if (buffer != null && mMediaCodec != null) {
             mRecordTime += size * 1.0f / (mSampleRate * 2 * 2);
             if (mOnRecordTimeChangeListener != null) {
                 mOnRecordTimeChangeListener.onRecordTimeChanged((int) mRecordTime);
             }
-            int inputBufferIndex = mEncoder.dequeueInputBuffer(0);
+            int inputBufferIndex = mMediaCodec.dequeueInputBuffer(0);
             if (inputBufferIndex >= 0) {
-                ByteBuffer byteBuffer = mEncoder.getInputBuffers()[inputBufferIndex];
+                ByteBuffer byteBuffer = mMediaCodec.getInputBuffers()[inputBufferIndex];
                 if (byteBuffer == null) {
                     MyLog.e("fetch ByteBuffer wrong!");
                     return;
                 }
                 byteBuffer.clear();
                 byteBuffer.put(buffer);
-                mEncoder.queueInputBuffer(inputBufferIndex, 0, size, 0, 0);
+                mMediaCodec.queueInputBuffer(inputBufferIndex, 0, size, 0, 0);
             }
-            int index = mEncoder.dequeueOutputBuffer(mInfo, 0);
+            int index = mMediaCodec.dequeueOutputBuffer(mBufferInfo, 0);
             while (index >= 0) {
                 try {
-                    mPerPcmSize = mInfo.size + 7;
+                    mPerPcmSize = mBufferInfo.size + 7;
                     mOutByteBuffer = new byte[mPerPcmSize];
-                    ByteBuffer byteBuffer = mEncoder.getOutputBuffers()[index];
+                    ByteBuffer byteBuffer = mMediaCodec.getOutputBuffers()[index];
                     if (byteBuffer == null) {
                         MyLog.e("fetch ByteBuffer wrong!");
                         return;
                     }
-                    byteBuffer.position(mInfo.offset);
-                    byteBuffer.limit(mInfo.offset + mInfo.size);
+                    byteBuffer.position(mBufferInfo.offset);
+                    byteBuffer.limit(mBufferInfo.offset + mBufferInfo.size);
 
                     addADtsHeader(mOutByteBuffer, mPerPcmSize, mAacSampleRate);
 
-                    byteBuffer.get(mOutByteBuffer, 7, mInfo.size);
-                    byteBuffer.position(mInfo.offset);
+                    byteBuffer.get(mOutByteBuffer, 7, mBufferInfo.size);
+                    byteBuffer.position(mBufferInfo.offset);
                     mAACOutputStream.write(mOutByteBuffer, 0, mPerPcmSize);
 
-                    mEncoder.releaseOutputBuffer(index, false);
-                    index = mEncoder.dequeueOutputBuffer(mInfo, 0);
+                    mMediaCodec.releaseOutputBuffer(index, false);
+                    index = mMediaCodec.dequeueOutputBuffer(mBufferInfo, 0);
                     mOutByteBuffer = null;
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -547,21 +547,40 @@ public class RayPlayer {
     public void decodeAVPacket(int dataSize, byte[] data){
 
         if (mSurface != null && dataSize > 0 && data != null && mMediaCodec != null) {
-            int inputBufferIndex = mMediaCodec.dequeueInputBuffer(10);
-            if (inputBufferIndex >= 0) {
-                ByteBuffer byteBuffer = mMediaCodec.getInputBuffers()[inputBufferIndex];
-                byteBuffer.clear();
-                byteBuffer.put(data);
-                mMediaCodec.queueInputBuffer(inputBufferIndex, 0, dataSize, 0, 0);
-            }
+            try {
+                int inputBufferIndex = mMediaCodec.dequeueInputBuffer(10);
+                if (inputBufferIndex >= 0) {
+                    ByteBuffer byteBuffer = mMediaCodec.getInputBuffers()[inputBufferIndex];
+                    byteBuffer.clear();
+                    byteBuffer.put(data);
+                    mMediaCodec.queueInputBuffer(inputBufferIndex, 0, dataSize, 0, 0);
+                }
 
-            int outputBufferIndex = mMediaCodec.dequeueOutputBuffer(mBufferInfo, 10);
-            while (outputBufferIndex >= 0) {
-                mMediaCodec.releaseOutputBuffer(outputBufferIndex, true);
-                outputBufferIndex = mMediaCodec.dequeueOutputBuffer(mBufferInfo, 10);
+                int outputBufferIndex = mMediaCodec.dequeueOutputBuffer(mBufferInfo, 10);
+                while (outputBufferIndex >= 0) {
+                    mMediaCodec.releaseOutputBuffer(outputBufferIndex, true);
+                    outputBufferIndex = mMediaCodec.dequeueOutputBuffer(mBufferInfo, 10);
+                }
+            } catch (Exception ignore){
+
             }
         }
 
+    }
+
+    private void releaseMediaCodecVideo(){
+        if (mMediaCodec != null) {
+            try{
+                mMediaCodec.flush();
+                mMediaCodec.stop();
+                mMediaCodec.release();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            mMediaCodec = null;
+            mMediaFormat = null;
+            mBufferInfo = null;
+        }
     }
 
 }

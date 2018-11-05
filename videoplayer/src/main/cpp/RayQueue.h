@@ -30,6 +30,8 @@ public:
 
     long getQueueSize();
     void clearAVPacket();
+
+    void noticeQueue();
 };
 
 

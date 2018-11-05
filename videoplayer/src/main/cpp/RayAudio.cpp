@@ -32,7 +32,8 @@ void *resampleRunnable(void *data) {
     //!!!fatal error :   RayAudio *audio = (RayAudio *) (&data);
     RayAudio *audio = (RayAudio *) (data);
     audio->initOpenSLES();
-    pthread_exit(&audio->play_thread);
+//    pthread_exit(&audio->play_thread);
+    return 0;
 }
 
 void *pcmBufferRunnable(void *data) {
@@ -88,9 +89,11 @@ void *pcmBufferRunnable(void *data) {
 }
 
 void RayAudio::play() {
-    rayBufferQueue = new RayBufferQueue(playStatus);
-    pthread_create(&play_thread, NULL, resampleRunnable, this);
-    pthread_create(&pcmBufferThread, NULL, pcmBufferRunnable, this);
+    if (playStatus != NULL && !playStatus->exit) {
+        rayBufferQueue = new RayBufferQueue(playStatus);
+        pthread_create(&play_thread, NULL, resampleRunnable, this);
+        pthread_create(&pcmBufferThread, NULL, pcmBufferRunnable, this);
+    }
 }
 
 int RayAudio::resampleAudio(void **pcmBuff) {
@@ -349,6 +352,12 @@ void RayAudio::stop() {
 
 void RayAudio::release() {
     stop();
+
+    if (packetQueue != NULL) {
+        packetQueue->noticeQueue();
+    }
+    pthread_join(play_thread, NULL);
+
     //删除AVPacket 队列 会调用RayQueue的析构函数
     if (packetQueue != NULL) {
         delete (packetQueue);

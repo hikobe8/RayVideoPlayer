@@ -63,3 +63,7 @@ void RayQueue::clearAVPacket() {
     }
     pthread_mutex_unlock(&mutexPacket);
 }
+
+void RayQueue::noticeQueue() {
+    pthread_cond_signal(&condPacket);
+}

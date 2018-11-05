@@ -174,15 +174,24 @@ void *playVideo(void *data) {
             pthread_mutex_unlock(&video->codecMutex);
         }
     }
-    pthread_exit(&video->play_thread);
-
+//    pthread_exit(&video->play_thread);
+    return 0;
 }
 
 void RayVideo::play() {
-    pthread_create(&play_thread, NULL, playVideo, this);
+    if (playStatus != NULL && !playStatus->exit) {
+        pthread_create(&play_thread, NULL, playVideo, this);
+    }
 }
 
 void RayVideo::release() {
+
+    if (queue != NULL) {
+        queue->noticeQueue();
+    }
+
+    pthread_join(play_thread, NULL);
+
     if (queue != NULL) {
         delete (queue);
         queue = NULL;
