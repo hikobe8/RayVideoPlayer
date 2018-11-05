@@ -114,8 +114,8 @@ void RayFFmpeg::decodeByFFmepg() {
         return;
     }
     getAvCodecContext(rayVideo->codecPar, &rayVideo->avCodecContext);
-    if (playStatus != NULL) {
-        if (callJava != NULL && !playStatus->exit) {
+    if (callJava != NULL) {
+        if (playStatus != NULL && !playStatus->exit) {
             callJava->onCallPrepared(CHILD_THREAD);
         } else {
             exit = true;

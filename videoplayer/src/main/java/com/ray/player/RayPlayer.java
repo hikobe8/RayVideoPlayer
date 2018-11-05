@@ -524,7 +524,7 @@ public class RayPlayer {
             try {
                 mRayGLSurfaceView.getVideoRenderer().setRenderType(VideoRenderer.RENDER_MEDIACODEC);
                 String mime = VideoSupportUtil.findVideoCodecName(codecName);
-                mMediaFormat = MediaFormat.createVideoFormat(VideoSupportUtil.findVideoCodecName(codecName), width, height);
+                mMediaFormat = MediaFormat.createVideoFormat(mime, width, height);
                 mMediaFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, width * height);
                 mMediaFormat.setByteBuffer("csd-0", ByteBuffer.wrap(csd_0));
                 mMediaFormat.setByteBuffer("csd-1", ByteBuffer.wrap(csd_1));
@@ -556,7 +556,7 @@ public class RayPlayer {
             }
 
             int outputBufferIndex = mMediaCodec.dequeueOutputBuffer(mBufferInfo, 10);
-            while (outputBufferIndex > 0) {
+            while (outputBufferIndex >= 0) {
                 mMediaCodec.releaseOutputBuffer(outputBufferIndex, true);
                 outputBufferIndex = mMediaCodec.dequeueOutputBuffer(mBufferInfo, 10);
             }

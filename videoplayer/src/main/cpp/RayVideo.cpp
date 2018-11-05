@@ -63,7 +63,7 @@ void *playVideo(void *data) {
 
                 double diff = video->getFrameDiffTime(NULL, avPacket);
 
-                av_usleep(static_cast<unsigned int>(video->getDelayTime(diff) * 1000000));
+                av_usleep(video->getDelayTime(diff) * 1000000);
                 video->rayCallJava->onCallDecodeAVPacket(avPacket->size, avPacket->data);
 
                 av_packet_free(&avPacket);
